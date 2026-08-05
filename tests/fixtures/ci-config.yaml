@@ -1,0 +1,54 @@
+# Configuration used by CI, selected with AGGREGATOR_CONFIG.
+#
+# Identical to the shipped config.yaml except that the sources loaded on first
+# run are served from tests/fixtures over localhost. CI therefore gets a board
+# with real content on it without depending on Hacker News, TechCrunch or
+# Reddit being reachable and unthrottled from a GitHub runner. Reddit in
+# particular blocks datacenter addresses, which would otherwise paint the badge
+# red for reasons that have nothing to do with this project.
+
+server:
+  host: "127.0.0.1"
+  port: 8001
+  debug: false
+
+database:
+  path: "aggregator.db"
+
+scheduler:
+  default_interval_seconds: 300
+  intervals:
+    rss: 300
+    youtube: 600
+    reddit: 600
+
+cache:
+  ttl_seconds: 600
+  max_items: 10000
+
+sources:
+  max_items_per_source: 50
+  request_timeout_seconds: 30
+  max_concurrent_fetches: 10
+
+rsshub:
+  url: "http://localhost:1200"
+
+display:
+  default_theme: "dark"
+  default_columns: 12
+  default_row_height: 150
+  compact_type: "vertical"
+
+# Served by `python -m http.server 8765 --directory tests/fixtures` in the
+# workflow. Two sources, because several tests need to tell panels apart.
+default_sources:
+  - name: "Sample Feed"
+    type: "rss"
+    url: "http://127.0.0.1:8765/sample_feed.xml"
+    refresh_seconds: 300
+
+  - name: "Sample Feed Two"
+    type: "rss"
+    url: "http://127.0.0.1:8765/sample_feed.xml?instance=2"
+    refresh_seconds: 300

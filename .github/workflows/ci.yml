@@ -1,0 +1,219 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  # Points the app at tests/fixtures/ci-config.yaml, whose sources are served
+  # from localhost. Without it CI would depend on Hacker News, TechCrunch and
+  # Reddit all being reachable and unthrottled from a GitHub runner, and Reddit
+  # blocks datacenter addresses outright.
+  AGGREGATOR_CONFIG: tests/fixtures/ci-config.yaml
+
+jobs:
+  backend:
+    name: Backend (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Import check
+        # A missing runtime dependency used to surface only as a failed import
+        # at startup, which no unit test exercised. python-multipart went absent
+        # and the entire app stopped starting.
+        run: python -c "import backend.app; print('backend.app imported OK')"
+
+      - name: Serve the fixture feeds
+        run: |
+          nohup python -m http.server 8765 --directory tests/fixtures > fixtures.log 2>&1 &
+          disown
+          for i in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:8765/sample_feed.xml > /dev/null; then
+              echo "fixture server up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "fixture server did not start"; cat fixtures.log; exit 1
+
+      - name: Start the service
+        # tests/test_dashboard.py and tests/test_ui_actions.py drive a live
+        # service over HTTP and skip themselves when nothing is listening.
+        # Without this they vanish from the run and CI still reports green,
+        # so the service starts first and the skips are audited below.
+        run: |
+          nohup python -m backend.app > server.log 2>&1 &
+          disown
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8001/api/health > /dev/null; then
+              echo "service up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "service failed to start within 30s"; cat server.log; exit 1
+
+      - name: Wait for the first fetch
+        # The scheduler pulls the fixture feeds a moment after startup, and the
+        # tests need items on the board.
+        run: |
+          for i in $(seq 1 30); do
+            count=$(curl -sf http://localhost:8001/api/content/source/1?limit=50 | python -c "import json,sys; print(len(json.load(sys.stdin)))" 2>/dev/null || echo 0)
+            if [ "$count" -gt 0 ]; then echo "$count items after ${i}s"; exit 0; fi
+            sleep 1
+          done
+          echo "no content was fetched"; cat server.log; exit 1
+
+      - name: Health and WebSocket routes are reachable
+        # Regression guard: the StaticFiles mount at "/" was once registered
+        # before these routes. Starlette matches in registration order, so a
+        # mount at "/" swallows everything declared after it and both of these
+        # returned 404 on any build that had a frontend.
+        run: |
+          curl -sf http://localhost:8001/api/health | tee /dev/stderr | grep -q '"status":"ok"'
+          # A plain GET to /ws returns 404 even when the route is healthy, so
+          # only a real upgrade handshake tells the two apart. curl holds the
+          # socket open after the 101 and exits non-zero on the timeout, hence
+          # the "|| true"; the status code is what matters.
+          # Sec-WebSocket-Key is a fresh random nonce, which is what a real
+          # client sends. Generated rather than hardcoded: the well known
+          # example value from RFC 6455 trips secret scanners, and it is not a
+          # secret at all.
+          nonce=$(head -c 16 /dev/urandom | base64)
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+            -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
+            -H 'Sec-WebSocket-Version: 13' -H "Sec-WebSocket-Key: $nonce" \
+            http://localhost:8001/ws || true)
+          echo "/ws handshake returned $code"
+          test "$code" = "101"
+
+      - name: Run tests
+        run: python -m pytest tests/ -v --tb=short --junitxml=results.xml -m "not browser"
+
+      - name: Audit skips
+        # The point of starting the service above. A skip for "service not
+        # running" means a whole tier of tests silently vanished and the green
+        # tick is worthless.
+        run: python tests/audit_skips.py results.xml
+
+      - name: Server log
+        if: always()
+        run: cat server.log || true
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Built entry point loads the bundle, not the dev source
+        # A stale frontend/public/index.html used to shadow the processed entry
+        # point. A dist/index.html still pointing at /src/main.jsx is a blank
+        # page in production, and it looks fine right up until you serve it.
+        run: |
+          test -f frontend/dist/index.html
+          grep -q '/assets/' frontend/dist/index.html
+          ! grep -q '/src/main.jsx' frontend/dist/index.html
+          echo "dist/index.html references the built assets"
+
+  e2e:
+    name: End to end (browser)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Build the frontend
+        # The backend serves frontend/dist, and these tests drive the real page.
+        working-directory: frontend
+        run: npm ci && npm run build
+
+      - name: Serve the fixture feeds
+        run: |
+          nohup python -m http.server 8765 --directory tests/fixtures > fixtures.log 2>&1 &
+          disown
+          for i in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:8765/sample_feed.xml > /dev/null; then
+              echo "fixture server up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "fixture server did not start"; cat fixtures.log; exit 1
+
+      - name: Start the service
+        run: |
+          nohup python -m backend.app > server.log 2>&1 &
+          disown
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8001/api/health > /dev/null; then
+              echo "service up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "service failed to start within 30s"; cat server.log; exit 1
+
+      - name: Wait for the first fetch
+        run: |
+          for i in $(seq 1 30); do
+            count=$(curl -sf http://localhost:8001/api/content/source/1?limit=50 | python -c "import json,sys; print(len(json.load(sys.stdin)))" 2>/dev/null || echo 0)
+            if [ "$count" -gt 0 ]; then echo "$count items after ${i}s"; exit 0; fi
+            sleep 1
+          done
+          echo "no content was fetched"; cat server.log; exit 1
+
+      - name: Run browser tests
+        run: python -m pytest tests/test_browser.py -v --tb=short --junitxml=browser-results.xml
+
+      - name: Audit skips
+        run: python tests/audit_skips.py browser-results.xml --allow-data-skips 3
+
+      - name: Server log
+        if: always()
+        run: cat server.log || true

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<!--
+  Source for docs/images/social-preview.png (1280x640).
+  Regenerate by loading this file at a 1280x640 viewport and screenshotting it.
+  Colours are taken from frontend/src/styles/index.css so the card matches the app.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+  :root {
+    --bg-primary: #0f0f0f;
+    --bg-secondary: #1a1a2e;
+    --bg-card: #16213e;
+    --text-primary: #e0e0e0;
+    --text-secondary: #a0a0a0;
+    --text-muted: #666;
+    --accent-bright: #e94560;
+    --accent-success: #00b894;
+    --border: #2a2a4a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1280px; height: 640px; overflow: hidden;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    background:
+      radial-gradient(900px 500px at 82% 12%, rgba(233, 69, 96, 0.16), transparent 60%),
+      radial-gradient(700px 460px at 8% 92%, rgba(15, 52, 96, 0.55), transparent 62%),
+      var(--bg-primary);
+    color: var(--text-primary);
+    display: flex; align-items: center;
+  }
+  .wrap { display: flex; width: 100%; padding: 0 68px; gap: 54px; align-items: center; }
+  .left { flex: 0 0 590px; }
+  .eyebrow {
+    font-size: 17px; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--accent-bright); font-weight: 700; margin-bottom: 20px;
+  }
+  h1 { font-size: 70px; line-height: 1.02; font-weight: 800; letter-spacing: -.022em; }
+  h1 .hl { color: var(--accent-bright); }
+  .sub {
+    margin-top: 22px; font-size: 25px; line-height: 1.45;
+    color: var(--text-secondary); max-width: 560px;
+  }
+  .chips { margin-top: 34px; display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip {
+    font-size: 16px; padding: 8px 15px; border-radius: 999px;
+    background: rgba(22, 33, 62, .85); border: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+  .chip.on { border-color: var(--accent-bright); color: #ffd7de; }
+
+  /* Miniature of the dashboard grid */
+  .right { flex: 1; display: flex; justify-content: center; }
+  .board {
+    width: 100%; max-width: 490px; background: rgba(15, 15, 15, .55);
+    border: 1px solid var(--border); border-radius: 14px; padding: 14px;
+    box-shadow: 0 26px 60px rgba(0, 0, 0, .55);
+  }
+  .bar { display: flex; align-items: center; gap: 7px; margin-bottom: 13px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; background: #33334d; }
+  .dot.r { background: var(--accent-bright); }
+  .tabs { margin-left: 12px; display: flex; gap: 15px; font-size: 12px; color: var(--text-muted); }
+  .tabs .cur { color: var(--accent-bright); font-weight: 700; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+  .panel {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 9px; padding: 11px; min-height: 96px;
+  }
+  .panel.tall { grid-row: span 2; }
+  .ptitle {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12.5px; font-weight: 700; margin-bottom: 9px;
+  }
+  .live { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-success); }
+  .badge {
+    font-size: 9.5px; padding: 1.5px 6px; border-radius: 999px;
+    background: rgba(233, 69, 96, .17); color: var(--accent-bright); font-weight: 700;
+  }
+  .line { height: 7px; border-radius: 4px; background: #223055; margin-bottom: 7px; }
+  .line.s { width: 62%; background: #1b2747; }
+  .line.m { width: 84%; }
+  .line.t { width: 44%; background: #1b2747; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="left">
+      <div class="eyebrow">Self-hosted</div>
+      <h1>Awesome<br /><span class="hl">Aggregator</span></h1>
+      <p class="sub">One dashboard for every feed you follow, arranged the way you want it, updating as you read.</p>
+      <div class="chips">
+        <span class="chip on">RSS</span>
+        <span class="chip on">YouTube</span>
+        <span class="chip on">Reddit</span>
+        <span class="chip">Drag-and-drop grid</span>
+        <span class="chip">Live updates</span>
+      </div>
+    </div>
+    <div class="right">
+      <div class="board">
+        <div class="bar">
+          <span class="dot r"></span><span class="dot"></span><span class="dot"></span>
+          <span class="tabs"><span class="cur">All</span><span>Bookmarks</span><span>Digest</span></span>
+        </div>
+        <div class="grid">
+          <div class="panel tall">
+            <div class="ptitle"><span class="live"></span>Hacker News<span class="badge">RSS</span></div>
+            <div class="line m"></div><div class="line s"></div>
+            <div class="line"></div><div class="line t"></div>
+            <div class="line m"></div><div class="line s"></div>
+            <div class="line"></div><div class="line t"></div>
+          </div>
+          <div class="panel">
+            <div class="ptitle"><span class="live"></span>r/technology<span class="badge">Reddit</span></div>
+            <div class="line m"></div><div class="line s"></div><div class="line t"></div>
+          </div>
+          <div class="panel">
+            <div class="ptitle"><span class="live"></span>Channel<span class="badge">YouTube</span></div>
+            <div class="line m"></div><div class="line s"></div><div class="line t"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,59 @@
+# Awesome Aggregator Configuration
+
+server:
+  host: "0.0.0.0"
+  port: 8001
+  debug: false
+
+database:
+  path: "aggregator.db"
+
+scheduler:
+  # Default refresh interval for all sources (seconds)
+  default_interval_seconds: 300  # 5 minutes
+  # Per-source type overrides
+  intervals:
+    rss: 300        # 5 minutes
+    youtube: 600    # 10 minutes
+    # Reddit rate limits its public Atom feed per IP, hard enough that two
+    # requests in quick succession get a 429. Ten minutes keeps a handful of
+    # subreddits inside the budget. Shorten it at your own risk.
+    reddit: 600     # 10 minutes
+
+cache:
+  ttl_seconds: 600       # 10 minutes
+  max_items: 10000
+
+sources:
+  max_items_per_source: 50
+  request_timeout_seconds: 30
+  max_concurrent_fetches: 10
+
+rsshub:
+  url: "http://localhost:1200"
+
+display:
+  default_theme: "dark"
+  default_columns: 12        # Grid columns
+  default_row_height: 150    # Pixels
+  compact_type: "vertical"   # vertical, horizontal, null
+
+# Default sources (loaded on first run)
+default_sources:
+  - name: "Hacker News"
+    type: "rss"
+    url: "https://hnrss.org/frontpage"
+    refresh_seconds: 300
+
+  - name: "TechCrunch"
+    type: "rss"
+    url: "https://techcrunch.com/feed/"
+    refresh_seconds: 600
+
+  # A source's own refresh_seconds wins over the per-type interval above, so
+  # this has to say 600 too or Reddit gets hit every two minutes and starts
+  # answering 429.
+  - name: "r/technology"
+    type: "reddit"
+    url: "https://www.reddit.com/r/technology"
+    refresh_seconds: 600

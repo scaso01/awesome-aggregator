@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "dashboard: functional dashboard regression tests (requires live service)",
+    "browser: end to end tests driven through a real browser (requires live service and a built frontend)",
+]

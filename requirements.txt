@@ -1,0 +1,39 @@
+# Awesome Aggregator - Python Dependencies
+
+# Web framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+# Required by the OPML import endpoint, which takes an UploadFile. FastAPI
+# refuses to register that route without it, so leaving it out did not degrade
+# one feature — it stopped the whole app from importing.
+python-multipart>=0.0.9
+
+# Async HTTP
+aiohttp>=3.11.0
+httpx>=0.28.0
+
+# RSS/Atom parsing
+feedparser>=6.0.0
+
+# Database
+aiosqlite>=0.21.0
+
+# Scheduling
+apscheduler>=3.10.0
+
+# Web content extraction
+trafilatura>=2.0.0
+beautifulsoup4>=4.12.0
+
+# Data validation
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+
+# YAML config
+pyyaml>=6.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# WebSocket (included in FastAPI/uvicorn)
+websockets>=14.0

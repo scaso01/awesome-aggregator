@@ -38,14 +38,19 @@ def normalize(path: str) -> str:
 
 
 def backend_routes() -> set[tuple[str, str]]:
-    """Every (method, normalized path) the app actually serves."""
+    """Every (method, normalized path) the app actually serves.
+
+    Read from the OpenAPI schema rather than by walking `app.routes`. Walking
+    the route objects is version fragile: under Starlette 1.x the routes added
+    by `include_router` are not all flat attributes on `app.routes`, so this
+    check saw six routes instead of the whole API and failed against every call
+    the frontend makes. The schema is the documented public surface and is
+    stable across both, which is exactly what a contract test should compare to.
+    """
     routes = set()
-    for route in app.routes:
-        path = getattr(route, "path", None)
-        if not path:
-            continue
-        for method in getattr(route, "methods", None) or ["GET"]:
-            if method in ("HEAD", "OPTIONS"):
+    for path, operations in app.openapi()["paths"].items():
+        for method in operations:
+            if method.upper() in ("HEAD", "OPTIONS", "PARAMETERS"):
                 continue
             routes.add((method.upper(), normalize(path)))
     return routes
@@ -77,9 +82,26 @@ def test_the_scan_actually_finds_calls():
 
 
 def test_the_route_table_is_populated():
+    """Guards the guard.
+
+    An empty or partial route table would fail every call below with a
+    misleading "the backend does not serve this", which is exactly what
+    happened when this read `app.routes` under a newer Starlette. The count
+    check catches a table that quietly loses most of itself.
+    """
     routes = backend_routes()
-    assert ("GET", "/api/health") in routes
-    assert ("POST", "/api/bookmarks") in routes
+    assert len(routes) >= 25, (
+        f"only {len(routes)} routes found, which is far short of the API. The "
+        f"route table is being read wrongly, not the backend missing routes."
+    )
+    for expected in [
+        ("GET", "/api/health"),
+        ("POST", "/api/bookmarks"),
+        ("POST", "/api/actions/hide"),
+        ("PUT", "/api/views/reorder"),
+        ("GET", "/api/digest/today"),
+    ]:
+        assert expected in routes, f"{expected} missing from the route table"
 
 
 def resolves(method: str, path: str, routes: set[tuple[str, str]]) -> bool:

@@ -77,6 +77,19 @@ backend was healthy, its tests passed, and the frontend compiled.
 - **Reader mode showed a large "Untitled" heading.** Extraction returns the
   literal string `Untitled` when it finds no heading, and that is truthy, so it
   beat the perfectly good title already on the item.
+- **OPML import and export could not be reached from the page.** Both endpoints
+  worked and both had passing tests, and the README advertised the feature, but
+  no control in the interface called either one. There are now Import and Export
+  buttons in the header. Export is a plain link, so the endpoint's existing
+  `Content-Disposition` header does the download with no JavaScript involved.
+- **One failed fetch retired a source permanently.** A failure sets the source's
+  status to `error`, and only sources with status `active` were scheduled at
+  startup, so after the next restart that source was never fetched again. Its
+  error could not clear either, because the only thing that clears one is a
+  successful fetch. A feed that was briefly unreachable, or a subreddit that hit
+  a rate limit once, was dead for good with no retry anywhere in the interface.
+  Everything except a paused source is now scheduled, and a successful fetch
+  clears the error state instead of only announcing it over the WebSocket.
 
 ### Fixed, other
 
@@ -93,6 +106,10 @@ backend was healthy, its tests passed, and the frontend compiled.
 - **The documented quick start pointed at the wrong port.** The README and setup
   guide said port 8000 while `config.yaml` and the Vite dev proxy both use 8001,
   so following the instructions gave a frontend that could not reach its API.
+- **RSS descriptions reached the screen still encoded.** The adapter stripped
+  HTML tags without decoding character references, so a summary rendered on the
+  board as `written.&#160;It&#8217;s&#160;a trend`. The Reddit adapter had
+  decoded all along, so this was one adapter out of step rather than a decision.
 
 ### Added
 
@@ -132,6 +149,21 @@ These are the checks that would have caught each class.
 - CI builds the frontend and asserts the built entry point references the bundle.
   A stale `frontend/public/index.html` used to shadow it, which produces a blank
   page in production and looks fine until it is served.
+- **Every display format is opened and checked.** Six are offered and only the
+  default one had ever been exercised. The action menu is grafted onto whatever
+  a format branch returns, which works on a plain element and silently does
+  nothing on anything else, so five formats were one refactor from losing their
+  menu with nothing to notice. The gallery format genuinely has no menu, and
+  that exclusion is now pinned by its own test so it cannot quietly spread.
+- **A new item is proved to reach an open page.** CI already checked that `/ws`
+  completes a handshake, which says nothing about whether anything is ever sent.
+  A test now serves a feed it can rewrite, adds a story to it, and waits for that
+  headline to appear in a browser that never reloads.
+- **View keyword filters are exercised through the tab bar**, not only against
+  the endpoint that applies them.
+- **Nothing on the board may show an undecoded HTML entity.** One check across
+  the rendered page covers every adapter and every format, which is the right
+  altitude for a bug whose real shape is "encoded text reached a human".
 - README rewritten for someone who has never seen the project. `SETUP.md` folded
   into it, since the two had already drifted apart.
 

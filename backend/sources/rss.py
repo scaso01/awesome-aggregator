@@ -1,7 +1,9 @@
 """RSS/Atom feed source adapter."""
 
+import re
 from datetime import datetime
 from email.utils import parsedate_to_datetime
+from html import unescape
 
 import aiohttp
 import feedparser
@@ -110,9 +112,21 @@ class RSSSource(BaseSource):
         return None
 
     @staticmethod
-    def _clean_description(html: str) -> str:
-        """Strip HTML tags from description for plain text display."""
-        import re
-        text = re.sub(r"<[^>]+>", "", html)
+    def _clean_description(raw: str) -> str:
+        """Strip HTML tags and decode entities for plain text display.
+
+        Decoding matters as much as stripping. Feeds routinely write
+        punctuation and spacing as character references, and without this step
+        they reached the panel verbatim: a TechCrunch summary rendered as
+        "written.&#160;It&#8217;s&#160;a trend" on screen. The Reddit adapter
+        has always unescaped, so this was one adapter out of step rather than a
+        deliberate choice.
+
+        The order is deliberate. Unescaping before the whitespace collapse
+        turns &#160; into a non-breaking space, which the collapse then folds
+        into an ordinary one, which is what the feed meant by it.
+        """
+        text = re.sub(r"<[^>]+>", "", raw)
+        text = unescape(text)
         text = re.sub(r"\s+", " ", text).strip()
         return text[:500] if text else ""

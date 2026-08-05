@@ -183,8 +183,9 @@ Most of the defects in the first public release were things no ordinary test cou
 | `test_reddit_source.py` | Feed parsing, against a real captured subreddit feed |
 | `test_frontend_api_contract.py` | A `fetch` aimed at a route or method the backend does not serve |
 | `test_frontend_wiring.py` | A component that is imported by nothing, or never rendered |
-| `test_dashboard.py`, `test_ui_actions.py` | Live HTTP, with the exact payloads the interface sends |
-| `test_browser.py` | The real page in Chromium: clicking, dragging, reloading |
+| `test_dashboard.py`, `test_ui_actions.py` | Live HTTP, with the exact payloads the interface sends, and a WebSocket that carries traffic rather than only completing a handshake |
+| `test_scheduler_recovery.py` | A source that fails once being able to come back |
+| `test_browser.py` | The real page in Chromium: clicking, dragging, reloading, every display format, and a pushed item arriving with no reload |
 
 Tests that need a live service skip themselves when there is not one. That is convenient locally and dangerous in CI, so `tests/audit_skips.py` splits skips into infrastructure and data. An infrastructure skip fails the build, because it means coverage quietly vanished. A data-dependent skip is allowed, capped and printed.
 
@@ -192,7 +193,7 @@ CI runs the suite on Python 3.12, 3.13 and 3.14 against fixture feeds served fro
 
 ## Troubleshooting
 
-**A panel shows an error instead of items.** The message in the panel is the fetch error verbatim. A 403 or 429 from Reddit is rate limiting, see the note above. For an RSS source, check the URL really serves a feed and not an HTML page.
+**A panel shows an error instead of items.** The message in the panel is the fetch error verbatim. A 403 or 429 from Reddit is rate limiting, see the note above. For an RSS source, check the URL really serves a feed and not an HTML page. A source in error keeps its normal schedule and clears itself on the next fetch that works, so a site being down for an hour fixes itself. Pausing a source is the only thing that stops it being refreshed.
 
 **The page loads but nothing updates.** The live push needs `/ws`. Open the browser console and look for a WebSocket failure. If you are behind a reverse proxy, it has to be configured to forward upgrade requests.
 

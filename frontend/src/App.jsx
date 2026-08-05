@@ -29,7 +29,9 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showMuted, setShowMuted] = useState(false)
+  const [opmlStatus, setOpmlStatus] = useState('')
   const wsRef = useRef(null)
+  const opmlInputRef = useRef(null)
 
   // View/tab state
   const [views, setViews] = useState([])
@@ -179,6 +181,33 @@ function App() {
     }
     ws.onclose = () => setTimeout(connectWebSocket, 3000)
     ws.onerror = (err) => console.error('WebSocket error:', err)
+  }
+
+  // Export is a plain link, because the endpoint already sends a
+  // Content-Disposition header and the browser knows what to do with it.
+  // Import needs the file, so it goes through a hidden input.
+  const importOpml = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setOpmlStatus('Importing...')
+    const body = new FormData()
+    body.append('file', file)
+    try {
+      // No Content-Type header: fetch has to set it itself so the multipart
+      // boundary matches the body, and naming it by hand breaks the upload.
+      const res = await fetch(`${API_BASE}/opml/import`, { method: 'POST', body })
+      if (!res.ok) throw new Error(`Import failed (${res.status})`)
+      const result = await res.json()
+      setOpmlStatus(`Imported ${result.imported}, skipped ${result.skipped}`)
+      fetchSources()
+    } catch (err) {
+      setOpmlStatus(err.message)
+    } finally {
+      // Clearing the value lets the same file be picked again straight after.
+      event.target.value = ''
+      // The result is a notice, not a permanent part of the header.
+      setTimeout(() => setOpmlStatus(''), 8000)
+    }
   }
 
   const addSource = async (sourceData) => {
@@ -479,6 +508,16 @@ function App() {
               {hiddenSources.length} hidden
             </button>
           )}
+          {opmlStatus && <span className="opml-status">{opmlStatus}</span>}
+          <input
+            ref={opmlInputRef}
+            type="file"
+            accept=".opml,.xml,text/xml,application/xml"
+            onChange={importOpml}
+            style={{ display: 'none' }}
+          />
+          <button className="btn" onClick={() => opmlInputRef.current?.click()}>Import</button>
+          <a className="btn" href={`${API_BASE}/opml/export`} download>Export</a>
           <button className="btn" onClick={() => setShowMuted(true)}>Muted</button>
           <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>+ Add Source</button>
         </div>

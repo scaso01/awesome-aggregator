@@ -42,6 +42,10 @@ Desktop.ini
 
 # Pytest
 .pytest_cache/
+# JUnit reports, written by both the local runs and CI, then read by
+# tests/audit_skips.py. Always a build artifact, never source.
+results.xml
+browser-results.xml
 
 # Generated files
 aggregator.db

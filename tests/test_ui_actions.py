@@ -14,12 +14,14 @@ Run with the service up:
     python -m pytest tests/test_ui_actions.py -v
 """
 
+import json
 import socket
 import time
 from contextlib import closing
 
 import httpx
 import pytest
+from websockets.sync.client import connect
 
 BASE_URL = "http://localhost:8001"
 
@@ -295,3 +297,39 @@ def test_reader_extract_answers_for_a_real_article(client):
     for key in ("title", "author", "date", "site_name", "hero_image",
                 "estimated_read_minutes"):
         assert key in body, f"ReaderMode renders {key}"
+
+
+# --- The WebSocket carries traffic, not just a handshake ----------------------
+
+
+def test_the_socket_delivers_scheduler_events(client, a_source):
+    """CI proves /ws completes a handshake. This proves it then carries events.
+
+    A socket that upgrades cleanly and never broadcasts looks identical from
+    outside, and would leave the board frozen until someone reloaded, which is
+    the one thing live updates are there to avoid.
+
+    The throwaway source points at a URL that cannot be fetched, which is what
+    makes this deterministic: the refresh is guaranteed to finish and report,
+    with no dependency on a real feed having published anything.
+    """
+    with connect(f"{BASE_URL.replace('http', 'ws')}/ws", open_timeout=15) as ws:
+        # Patching reschedules the job to run within seconds. It is the only
+        # handle the API offers for "refresh this now".
+        patched = client.patch(
+            f"/api/sources/{a_source['id']}", json={"refresh_seconds": 301}
+        )
+        assert patched.status_code == 200, patched.text
+
+        deadline = time.time() + 60
+        while time.time() < deadline:
+            try:
+                raw = ws.recv(timeout=10)
+            except TimeoutError:
+                continue
+            message = json.loads(raw)
+            if message.get("source_id") == a_source["id"]:
+                assert message["type"] in ("source_update", "new_content")
+                return
+
+    pytest.fail("the refresh produced no WebSocket message for that source")

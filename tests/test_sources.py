@@ -68,6 +68,29 @@ class TestRSSSource:
     def test_clean_description_empty(self):
         assert RSSSource._clean_description("") == ""
 
+    def test_clean_description_decodes_character_references(self):
+        """Straight from a TechCrunch summary that shipped in a screenshot.
+
+        Stripping tags without decoding entities put "&#8217;" and "&#160;" on
+        screen as literal text in the middle of a sentence. The Reddit adapter
+        decoded all along, so this was one adapter out of step.
+        """
+        raw = "written.&#160;It&#8217;s&#160;a trend that&#8217;s been building"
+        result = RSSSource._clean_description(raw)
+        # &#8217; is a right single quotation mark, not an ASCII apostrophe.
+        assert result == "written. It’s a trend that’s been building"
+        assert "&#" not in result
+
+    def test_clean_description_decodes_named_entities(self):
+        result = RSSSource._clean_description("<p>Fish &amp; chips &mdash; cheap</p>")
+        assert result == "Fish & chips — cheap"
+
+    def test_clean_description_folds_a_non_breaking_space(self):
+        """&#160; has to end up as an ordinary space, not a stray \\xa0."""
+        result = RSSSource._clean_description("one&#160;&#160;two")
+        assert result == "one two"
+        assert "\xa0" not in result
+
 
 # --- YouTube Source Tests ---
 

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from backend.config import DEFAULT_INTERVAL, SOURCE_INTERVALS, logger
-from backend.database import get_active_sources, update_source, upsert_content_items
+from backend.database import get_all_sources, update_source, upsert_content_items
 from backend.sources import create_source_adapter
 from backend.sources.base import SourceFetchError
 from backend.websocket import manager
@@ -33,6 +33,11 @@ async def refresh_source(source_id: int, source_type: str, url: str, name: str):
         else:
             logger.debug(f"Refreshed '{name}': no items returned")
 
+        # Clear any earlier failure. The broadcast below already told the page
+        # this source was healthy again, but the database was never updated to
+        # match, so the red status dot survived every later success and the
+        # source stayed marked as broken for good.
+        await update_source(source_id, status="active", last_error=None)
         await manager.send_source_update(source_id, "active")
 
     except SourceFetchError as e:
@@ -89,8 +94,17 @@ def unschedule_source(source_id: int):
 
 
 async def schedule_all_active_sources():
-    """Schedule refresh jobs for all active sources in the database."""
-    sources = await get_active_sources()
+    """Schedule refresh jobs for every source that is not paused.
+
+    Sources currently in error are included on purpose. Fetches fail for
+    ordinary, temporary reasons: a feed goes down for an hour, a network drops,
+    a host rate limits. Scheduling only status="active" meant a single failure
+    took the source out of the rotation at the next restart and nothing could
+    ever put it back, because the only thing that clears an error is a
+    successful refresh and that refresh was no longer scheduled. Pausing stays
+    the deliberate off switch.
+    """
+    sources = [s for s in await get_all_sources() if s["status"] != "paused"]
     for source in sources:
         schedule_source(
             source_id=source["id"],
@@ -99,7 +113,7 @@ async def schedule_all_active_sources():
             name=source["name"],
             interval_seconds=source["refresh_seconds"],
         )
-    logger.info(f"Scheduled {len(sources)} active sources")
+    logger.info(f"Scheduled {len(sources)} sources")
 
 
 def start_scheduler():

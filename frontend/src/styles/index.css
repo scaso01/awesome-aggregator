@@ -78,6 +78,22 @@ body {
   border-color: var(--accent-bright);
 }
 
+/* OPML export is a link rather than a button, so the endpoint's
+   Content-Disposition header does the download with no JavaScript at all.
+   These rules make it sit alongside the real buttons. */
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  line-height: 1;
+}
+
+.opml-status {
+  align-self: center;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
 .btn-primary {
   background: var(--accent-bright);
   border-color: var(--accent-bright);

@@ -94,6 +94,18 @@ a.btn {
   color: var(--text-secondary);
 }
 
+/* Why an add was refused. Adding a feed you already follow is the usual
+   reason, and it used to fail with nothing on screen at all. */
+.add-source-error {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--accent-bright);
+  border-radius: var(--radius);
+  background: rgba(255, 59, 92, 0.08);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
 .btn-primary {
   background: var(--accent-bright);
   border-color: var(--accent-bright);

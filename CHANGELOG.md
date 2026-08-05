@@ -82,6 +82,16 @@ backend was healthy, its tests passed, and the frontend compiled.
   no control in the interface called either one. There are now Import and Export
   buttons in the header. Export is a plain link, so the endpoint's existing
   `Content-Disposition` header does the download with no JavaScript involved.
+- **Adding a feed you already follow was a 500, and the dialog said nothing.**
+  The `url` column is unique and the single add endpoint let the resulting
+  `IntegrityError` out of the database layer, so an ordinary accidental repeat
+  crashed with a stack trace in the log. The batch endpoint beside it has
+  always skipped duplicates, so the two disagreed about what a duplicate is.
+  It answers 409 with a readable reason now. The interface had the matching
+  half of the problem: `addSource` acted only on success, so any refusal left
+  the dialog open and unchanged with nothing on screen, which is
+  indistinguishable from the click not registering. The reason is now shown in
+  the dialog.
 - **One failed fetch retired a source permanently.** A failure sets the source's
   status to `error`, and only sources with status `active` were scheduled at
   startup, so after the next restart that source was never fetched again. Its

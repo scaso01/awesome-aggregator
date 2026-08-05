@@ -210,6 +210,10 @@ function App() {
     }
   }
 
+  // Returns null when the source was added, or a message to show the user.
+  // It used to return nothing and only act on success, so a rejected add left
+  // the dialog sitting open with no explanation. Adding a feed you already
+  // follow is the common way to land here.
   const addSource = async (sourceData) => {
     try {
       const res = await fetch(`${API_BASE}/sources/`, {
@@ -217,8 +221,17 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sourceData),
       })
-      if (res.ok) { setShowAddModal(false); fetchSources() }
-    } catch (err) { console.error('Failed to add source:', err) }
+      if (res.ok) {
+        setShowAddModal(false)
+        fetchSources()
+        return null
+      }
+      const body = await res.json().catch(() => ({}))
+      return body.detail || `Could not add that source (${res.status})`
+    } catch (err) {
+      console.error('Failed to add source:', err)
+      return err.message || 'Could not reach the server'
+    }
   }
 
   const batchAddSources = async (sourcesArray) => {

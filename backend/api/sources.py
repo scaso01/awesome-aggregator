@@ -1,5 +1,7 @@
 """API routes for content source management."""
 
+import sqlite3
+
 from fastapi import APIRouter, HTTPException
 
 from backend.database import (
@@ -30,14 +32,25 @@ async def get_source_detail(source_id: int):
 @router.post("/", status_code=201)
 async def add_source(data: SourceCreate):
     """Add a new content source."""
-    source = await create_source(
-        name=data.name,
-        source_type=data.source_type.value,
-        url=data.url,
-        refresh_seconds=data.refresh_seconds,
-        display_format=data.display_format.value,
-        category=data.category,
-    )
+    try:
+        source = await create_source(
+            name=data.name,
+            source_type=data.source_type.value,
+            url=data.url,
+            refresh_seconds=data.refresh_seconds,
+            display_format=data.display_format.value,
+            category=data.category,
+        )
+    except sqlite3.IntegrityError as exc:
+        # url is unique, and adding a feed you already follow is an ordinary
+        # thing to do by accident. This used to come out of the database layer
+        # as an unhandled 500 with a stack trace in the log. The batch endpoint
+        # has always skipped duplicates quietly, so the two paths disagreed
+        # about what a duplicate even means.
+        raise HTTPException(
+            status_code=409,
+            detail="A source with this URL already exists",
+        ) from exc
 
     # Schedule the new source for periodic refresh
     schedule_source(

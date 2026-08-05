@@ -695,6 +695,31 @@ def test_opml_import_adds_the_feeds_in_the_file(page):
                     client.delete(f"/api/sources/{source['id']}")
 
 
+def test_a_refused_add_says_why(page):
+    """A rejected add used to leave the dialog open and silent.
+
+    `addSource` acted only on success, so any refusal did nothing visible at
+    all: the dialog stayed exactly as it was and the user had no way to tell
+    whether the click had registered. Re-adding a feed already on the board is
+    the ordinary way to reach it, and until now that was also a 500.
+    """
+    with httpx.Client(base_url=BASE_URL, timeout=30.0) as client:
+        existing = client.get("/api/sources/").json()
+    assert existing, "no sources to duplicate"
+    duplicate_url = existing[0]["url"]
+
+    page.get_by_role("button", name="+ Add Source").click()
+    page.wait_for_selector(".tab-bar", timeout=15000)
+    page.get_by_role("button", name="Custom URL").click()
+    page.locator('input[type="text"]').first.fill("A feed I already follow")
+    page.locator('input[type="url"]').fill(duplicate_url)
+    page.get_by_role("button", name="Add Source", exact=True).click()
+
+    page.wait_for_selector(".add-source-error", timeout=20000)
+    message = page.locator(".add-source-error").inner_text()
+    assert "already exists" in message.lower(), f"unhelpful message: {message!r}"
+
+
 # --- Live updates over the WebSocket ------------------------------------------
 #
 # CI proves the /ws route completes a handshake. That is the easy half. Nothing

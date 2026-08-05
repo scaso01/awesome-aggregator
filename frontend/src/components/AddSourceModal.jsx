@@ -22,6 +22,7 @@ export default function AddSourceModal({ onAdd, onBatchAdd, onClose }) {
   const [searchResults, setSearchResults] = useState([])
   const [searching, setSearching] = useState(false)
   const [adding, setAdding] = useState(null)
+  const [addError, setAddError] = useState(null)
   const [selectedFormat, setSelectedFormat] = useState('compact')
 
   const [bundles, setBundles] = useState([])
@@ -64,20 +65,25 @@ export default function AddSourceModal({ onAdd, onBatchAdd, onClose }) {
 
   const quickAdd = async (source) => {
     setAdding(source.name)
-    await onAdd({
+    setAddError(await onAdd({
       name: source.name,
       source_type: source.type,
       url: source.url,
       refresh_seconds: 300,
       display_format: selectedFormat,
-    })
+    }))
     setAdding(null)
   }
 
-  const handleCustomSubmit = (e) => {
+  const handleCustomSubmit = async (e) => {
     e.preventDefault()
     if (!name || !url) return
-    onAdd({ name, source_type: sourceType, url, refresh_seconds: refreshSeconds, display_format: customFormat })
+    // onAdd resolves to null on success, or to the reason it refused. Without
+    // this the dialog stayed open doing nothing at all on a rejected add.
+    setAddError(await onAdd({
+      name, source_type: sourceType, url,
+      refresh_seconds: refreshSeconds, display_format: customFormat,
+    }))
   }
 
   const renderSourceCard = (source, idx) => (
@@ -111,6 +117,10 @@ export default function AddSourceModal({ onAdd, onBatchAdd, onClose }) {
         </div>
 
         <div className="modal-body">
+          {/* Sits above every tab, because an add can be refused from any of
+              them and the reason has to be somewhere the user is looking. */}
+          {addError && <div className="add-source-error">{addError}</div>}
+
           {/* Format picker for browse/search tabs */}
           {(tab === 'browse' || tab === 'search') && (
             <div className="format-select-row">

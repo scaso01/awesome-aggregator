@@ -286,6 +286,26 @@ class TestSourcesCRUD:
         finally:
             _delete_source(client, source["id"])
 
+    def test_create_duplicate_url_is_a_conflict_not_a_crash(
+        self, client, source_payload
+    ):
+        """Adding a feed you already follow is ordinary, not exceptional.
+
+        The url column is unique, and this endpoint let the IntegrityError out
+        of the database layer, so an accidental repeat was a 500 with a stack
+        trace in the log. The batch endpoint beside it has always skipped
+        duplicates, so the two disagreed about what a duplicate means.
+        """
+        source = _create_source(client, source_payload)
+        try:
+            resp = client.post("/api/sources/", json=source_payload)
+            assert resp.status_code == 409, (
+                f"expected a conflict, got {resp.status_code}: {resp.text[:200]}"
+            )
+            assert "already exists" in resp.json()["detail"]
+        finally:
+            _delete_source(client, source["id"])
+
 
 # -------------------------------------------------------------------
 # Content Feed

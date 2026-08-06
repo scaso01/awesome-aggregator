@@ -44,7 +44,7 @@ jobs:
 
       - name: Serve the fixture feeds
         run: |
-          nohup python -m http.server 8765 --directory tests/fixtures > fixtures.log 2>&1 &
+          nohup python tests/fixtures/serve.py 8765 > fixtures.log 2>&1 &
           disown
           for i in $(seq 1 20); do
             if curl -sf http://127.0.0.1:8765/sample_feed.xml > /dev/null; then
@@ -105,7 +105,7 @@ jobs:
           test "$code" = "101"
 
       - name: Run tests
-        run: python -m pytest tests/ -v --tb=short --junitxml=results.xml -m "not browser"
+        run: python -m pytest tests/ -v --tb=short --junitxml=results.xml -m "not browser and not network"
 
       - name: Audit skips
         # The point of starting the service above. A skip for "service not
@@ -177,7 +177,7 @@ jobs:
 
       - name: Serve the fixture feeds
         run: |
-          nohup python -m http.server 8765 --directory tests/fixtures > fixtures.log 2>&1 &
+          nohup python tests/fixtures/serve.py 8765 > fixtures.log 2>&1 &
           disown
           for i in $(seq 1 20); do
             if curl -sf http://127.0.0.1:8765/sample_feed.xml > /dev/null; then

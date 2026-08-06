@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A real image for the fixture feed, so the thumbnail click-target test runs
+     in CI instead of skipping for want of a picture. Most of that thumbnail was
+     once unclickable, and the test that proves otherwise needs one to measure. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180">
+  <rect width="320" height="180" fill="#1e2438"/>
+  <circle cx="160" cy="90" r="52" fill="#ff3b5c"/>
+  <text x="160" y="98" font-family="sans-serif" font-size="26" fill="#ffffff"
+        text-anchor="middle">SAMPLE</text>
+</svg>

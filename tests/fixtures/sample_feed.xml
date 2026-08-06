@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
   <channel>
     <title>Sample Feed</title>
     <link>https://example.com/</link>
@@ -10,6 +10,7 @@
       <description>This domain is for use in illustrative examples in documents.</description>
       <author>docs@example.com (Documentation Team)</author>
       <pubDate>Tue, 05 Aug 2026 09:00:00 GMT</pubDate>
+      <media:thumbnail url="http://127.0.0.1:8765/thumb.svg" width="320" height="180"/>
       <guid isPermaLink="false">sample-item-1</guid>
     </item>
     <item>
@@ -18,6 +19,7 @@
       <description>Explains why example.com and friends exist and how they may be used.</description>
       <author>iana@example.com (IANA)</author>
       <pubDate>Tue, 05 Aug 2026 08:30:00 GMT</pubDate>
+      <media:thumbnail url="http://127.0.0.1:8765/thumb.svg" width="320" height="180"/>
       <guid isPermaLink="false">sample-item-2</guid>
     </item>
     <item>

@@ -122,3 +122,59 @@ def test_catalog_entry_is_alive(entry):
         f"That is how the ESPN feeds looked while three panels sat on "
         f"\"Loading...\" forever."
     )
+
+
+# --- Only offer what this installation can actually use ------------------------
+
+
+async def test_rsshub_sources_are_not_offered_when_rsshub_is_down(client):
+    """Sixteen catalog entries are RSSHub routes.
+
+    RSSHub is a separate service this project does not ship and the README
+    calls optional, so for anyone who has not run one these were sixteen
+    entries in the picker that could only ever produce a connection error.
+    Adding a source that cannot work is worse than not offering it.
+    """
+    import backend.api.discover as discover
+
+    discover._RSSHUB_STATE = (None, False)  # no cached answer from another test
+
+    for path in ("/api/discover/suggestions", "/api/discover/onboarding/sources?topics=news"):
+        res = await client.get(path)
+        assert res.status_code == 200, res.text
+        offered = res.json()
+        rsshub = [s for s in offered if s["url"].startswith(discover.RSSHUB_URL)]
+        assert not rsshub, (
+            f"{path} offered {len(rsshub)} source(s) that need RSSHub, which is "
+            f"not running: {[s['name'] for s in rsshub][:3]}"
+        )
+
+
+async def test_the_rsshub_entries_are_filtered_not_deleted(client):
+    """They come back for anyone who does run RSSHub, so the catalog keeps them."""
+    from backend.api.discover import SOURCE_CATALOG, is_rsshub_source
+
+    kept = [s for s in SOURCE_CATALOG if is_rsshub_source(s)]
+    assert kept, "the RSSHub entries were removed rather than filtered"
+
+
+async def test_topic_counts_match_what_gets_added(client):
+    """The card says "14 sources". It has to mean it.
+
+    Counting the whole catalog while the add path filtered would promise more
+    than the picker delivers.
+    """
+    import backend.api.discover as discover
+
+    discover._RSSHUB_STATE = (None, False)
+
+    topics = (await client.get("/api/discover/onboarding/topics")).json()
+    assert topics
+    for topic in topics:
+        added = (
+            await client.get(f"/api/discover/onboarding/sources?topics={topic['id']}")
+        ).json()
+        assert len(added) == topic["source_count"], (
+            f"the {topic['name']} card promises {topic['source_count']} sources "
+            f"and adds {len(added)}"
+        )

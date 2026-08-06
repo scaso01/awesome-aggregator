@@ -1,11 +1,18 @@
 """API routes for source discovery, search, and suggestions."""
 
+import time
+
 import aiohttp
 from fastapi import APIRouter, Query
 
 from backend.config import RSSHUB_URL, REQUEST_TIMEOUT, logger
 
 router = APIRouter(prefix="/api/discover", tags=["discover"])
+
+# Cached answer to "is RSSHub reachable", so the picker does not probe it on
+# every request. (checked_at_monotonic, healthy)
+_RSSHUB_STATE: tuple[float | None, bool] = (None, False)
+RSSHUB_CACHE_SECONDS = 120
 
 # Curated source catalog — organized by category
 # Each entry maps to an RSSHub route or direct RSS/API URL
@@ -546,9 +553,12 @@ def _resolve_bundle_sources(bundle: dict) -> list[dict]:
 @router.get("/bundles")
 async def get_bundles():
     """Get starter bundles with resolved source details."""
+    usable = {s["name"] for s in await offerable_sources()}
     result = []
     for bundle in STARTER_BUNDLES:
-        sources = _resolve_bundle_sources(bundle)
+        sources = [
+            s for s in _resolve_bundle_sources(bundle) if s["name"] in usable
+        ]
         result.append({
             "id": bundle["id"],
             "name": bundle["name"],
@@ -563,10 +573,11 @@ async def get_bundles():
 @router.get("/onboarding/topics")
 async def get_onboarding_topics():
     """Get onboarding topic cards with source counts."""
+    catalog = await offerable_sources()
     result = []
     for topic in ONBOARDING_TOPICS:
         count = sum(
-            1 for s in SOURCE_CATALOG
+            1 for s in catalog
             if s["category"] in topic["categories"]
         )
         result.append({
@@ -591,23 +602,25 @@ async def get_onboarding_sources(topics: str = Query(..., min_length=1)):
         if topic:
             categories.update(topic["categories"])
 
-    sources = [s for s in SOURCE_CATALOG if s["category"] in categories]
+    catalog = await offerable_sources()
+    sources = [s for s in catalog if s["category"] in categories]
     return sources
 
 
 @router.get("/suggestions")
 async def get_suggestions(category: str = None):
     """Get suggested sources, optionally filtered by category."""
+    catalog = await offerable_sources()
     if category:
-        return [s for s in SOURCE_CATALOG if s["category"].lower() == category.lower()]
-    return SOURCE_CATALOG
+        return [s for s in catalog if s["category"].lower() == category.lower()]
+    return catalog
 
 
 @router.get("/categories")
 async def get_categories():
     """Get all available source categories."""
     cats = {}
-    for s in SOURCE_CATALOG:
+    for s in await offerable_sources():
         cat = s["category"]
         if cat not in cats:
             cats[cat] = 0
@@ -720,6 +733,47 @@ async def search_sources(q: str = Query(..., min_length=2)):
         pass  # RSSHub search is best-effort
 
     return results
+
+
+def is_rsshub_source(entry: dict) -> bool:
+    """Does this catalog entry only work if RSSHub is running?"""
+    return entry["url"].startswith(RSSHUB_URL)
+
+
+async def rsshub_available() -> bool:
+    """Is RSSHub actually reachable, cached briefly.
+
+    Sixteen catalog entries are RSSHub routes. RSSHub is a separate service
+    this project does not ship, and the README calls it optional, so for anyone
+    who has not run one those sixteen were sixteen sources in the picker that
+    could only ever produce a connection error. Offering a source that cannot
+    work is worse than not offering it.
+    """
+    global _RSSHUB_STATE
+    now = time.monotonic()
+    cached_at, healthy = _RSSHUB_STATE
+    if cached_at is not None and (now - cached_at) < RSSHUB_CACHE_SECONDS:
+        return healthy
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"{RSSHUB_URL}/healthz",
+                timeout=aiohttp.ClientTimeout(total=3),
+            ) as resp:
+                healthy = resp.status == 200
+    except Exception:  # noqa: BLE001 - any failure means "cannot use it"
+        healthy = False
+
+    _RSSHUB_STATE = (now, healthy)
+    return healthy
+
+
+async def offerable_sources() -> list[dict]:
+    """The catalog, minus anything that cannot work in this installation."""
+    if await rsshub_available():
+        return SOURCE_CATALOG
+    return [s for s in SOURCE_CATALOG if not is_rsshub_source(s)]
 
 
 @router.get("/rsshub/test")

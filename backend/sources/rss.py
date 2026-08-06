@@ -39,6 +39,24 @@ class RSSSource(BaseSource):
                 source_url=self.url
             )
 
+        # feedparser does not flag a response that simply is not a feed. An
+        # empty body parses to bozo=False with no entries, and so does an HTML
+        # page, so both were recorded as a perfectly healthy fetch that just
+        # happened to return nothing. Three ESPN panels sat on "Loading..."
+        # forever because ESPN answers this client with an empty 202.
+        #
+        # `version` is the reliable signal: a real feed carries "rss20",
+        # "atom10" and so on, an unrecognised document carries "" and an empty
+        # body carries None. A genuine feed that currently has no items keeps
+        # its version and is left alone, because that is not an error.
+        if not feed.get("version"):
+            raise SourceFetchError(
+                "The response is not a feed. Check the URL points at a feed "
+                "rather than a web page, and that the site is not blocking "
+                "this client.",
+                source_url=self.url
+            )
+
         items = []
         for entry in feed.entries:
             published = self._parse_date(entry)

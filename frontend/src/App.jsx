@@ -333,6 +333,20 @@ function App() {
     setShowViewEditor(true)
   }
 
+  const handleEditView = (view) => {
+    setEditingView(view)
+    setShowViewEditor(true)
+  }
+
+  const handleDeleteView = async (viewId) => {
+    try {
+      await fetch(`${API_BASE}/views/${viewId}`, { method: 'DELETE' })
+      setShowViewEditor(false)
+      if (activeViewId === viewId) setActiveViewId(null)
+      fetchViews()
+    } catch (err) { console.error('Failed to delete view:', err) }
+  }
+
   const handleReorderViews = async (orderedIds) => {
     // Optimistic reorder
     const reordered = orderedIds.map(id => views.find(v => v.id === id)).filter(Boolean)
@@ -541,6 +555,7 @@ function App() {
         activeViewId={activeViewId}
         onSelectView={handleSelectView}
         onCreateView={handleCreateView}
+        onEditView={handleEditView}
         onReorderViews={handleReorderViews}
       />
 
@@ -580,6 +595,7 @@ function App() {
           view={editingView}
           sources={sources}
           onSave={() => { setShowViewEditor(false); fetchViews() }}
+          onDelete={handleDeleteView}
           onClose={() => setShowViewEditor(false)}
         />
       )}

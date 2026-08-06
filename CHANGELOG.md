@@ -82,6 +82,39 @@ backend was healthy, its tests passed, and the frontend compiled.
   no control in the interface called either one. There are now Import and Export
   buttons in the header. Export is a plain link, so the endpoint's existing
   `Content-Disposition` header does the download with no JavaScript involved.
+- **Every include keyword typed into a view was thrown away.** The editor sent
+  them as `include_keywords`, which is not a field the API has. Pydantic drops
+  an unknown field and answers 201, so the view saved, the tab appeared, and
+  the filter did nothing. Reading the saved value back was broken the same way,
+  so an existing view always opened with an empty include list. The field is
+  called `topic_filters`.
+- **A view could not be edited or deleted once created.** `ViewEditor` has a
+  complete Edit mode, and the only thing that could have opened it always
+  passed null, so it was unreachable: no renaming, no changing which sources a
+  view covers, no changing its keywords. There was no delete anywhere either,
+  so a view made by accident was permanent. The active tab now carries a pencil
+  that opens the editor, and the editor has a Delete button.
+- **The muted sources manager named nothing.** It read `name` and `expires_at`;
+  the endpoint returns `source_name` and `mute_until`. Every row said
+  "Source #12" and every mute read as Permanent no matter how it was set, which
+  makes the one screen for undoing a mute close to useless.
+- **A panel with nothing in it said "Loading..." forever.** An empty panel was
+  only ever loading or in error, with no third state, and `last_fetched` was
+  written inside the item upsert so a fetch that returned nothing never stamped
+  it. A source that fetched cleanly and had no items was therefore
+  indistinguishable from one that had never been tried.
+- **A response that is not a feed at all counted as a healthy fetch.**
+  `feedparser` reports an empty body as `bozo=False` with no entries, and does
+  the same for an HTML page, so both looked like a feed that simply had no news
+  today. This is why three ESPN panels sat spinning: ESPN answers this client
+  with an empty 202. An unrecognised response is now a fetch error that says so.
+- **Twelve of the shipped catalog's feeds were dead.** Choosing the Sports
+  topic on a fresh install gave three ESPN panels stuck on "Loading..." and one
+  404 from Bleacher Report. AP News answered 401, Politico and Serious Eats 403,
+  Python Weekly 404, AnandTech is gone, and two YouTube entries pointed at
+  channel addresses that no longer exist. Replaced with feeds that were checked,
+  and `tests/test_catalog.py` now covers both the structure and, on demand, the
+  live URLs.
 - **Adding a feed you already follow was a 500, and the dialog said nothing.**
   The `url` column is unique and the single add endpoint let the resulting
   `IntegrityError` out of the database layer, so an ordinary accidental repeat

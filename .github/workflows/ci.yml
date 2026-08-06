@@ -209,6 +209,11 @@ jobs:
           echo "no content was fetched"; cat server.log; exit 1
 
       - name: Run browser tests
+        # The first-run test empties every source and rebuilds them, which is
+        # fine against this throwaway database and rude against the instance
+        # someone actually reads, so it only runs where that is set.
+        env:
+          AGGREGATOR_E2E_DESTRUCTIVE: "1"
         run: python -m pytest tests/test_browser.py -v --tb=short --junitxml=browser-results.xml
 
       - name: Audit skips

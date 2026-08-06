@@ -94,6 +94,20 @@ a.btn {
   color: var(--text-secondary);
 }
 
+/* Opens the view editor for the tab you are already on. Only shown on the
+   active tab, so the bar stays quiet. */
+.view-tab-edit {
+  margin-left: 6px;
+  opacity: 0.6;
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
+.view-tab-edit:hover {
+  opacity: 1;
+  color: var(--accent-bright);
+}
+
 /* Why an add was refused. Adding a feed you already follow is the usual
    reason, and it used to fail with nothing on screen at all. */
 .add-source-error {
@@ -341,6 +355,14 @@ a.btn {
 
 .error-text {
   color: var(--accent-error);
+  font-size: 0.8rem;
+}
+
+/* A source that fetched cleanly and had nothing to show. Distinct from an
+   error, and distinct from still loading, both of which it used to be
+   confused with. */
+.empty-text {
+  color: var(--text-muted);
   font-size: 0.8rem;
 }
 

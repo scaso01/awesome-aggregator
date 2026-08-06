@@ -7,13 +7,16 @@ const EMOJI_OPTIONS = [
   '🌍', '🏠', '🍔', '✈️', '💰', '🎨', '🔧', '📱', '🎯', '⭐',
 ]
 
-export default function ViewEditor({ view, sources, onSave, onClose }) {
+export default function ViewEditor({ view, sources, onSave, onDelete, onClose }) {
   const [name, setName] = useState(view?.name || '')
   const [icon, setIcon] = useState(view?.icon || '')
   const [selectedSourceIds, setSelectedSourceIds] = useState(
     view?.source_ids ? new Set(view.source_ids) : new Set()
   )
-  const [includeKeywords, setIncludeKeywords] = useState(view?.include_keywords || [])
+  // The API calls this topic_filters. Reading view.include_keywords meant an
+  // existing view always opened with an empty include list, however many
+  // keywords it actually had, and saving then wiped them.
+  const [includeKeywords, setIncludeKeywords] = useState(view?.topic_filters || [])
   const [excludeKeywords, setExcludeKeywords] = useState(view?.exclude_keywords || [])
   const [includeInput, setIncludeInput] = useState('')
   const [excludeInput, setExcludeInput] = useState('')
@@ -52,7 +55,11 @@ export default function ViewEditor({ view, sources, onSave, onClose }) {
         name: name.trim(),
         icon,
         source_ids: Array.from(selectedSourceIds),
-        include_keywords: includeKeywords,
+        // topic_filters is what the API named this field. Sending
+        // include_keywords looked like it worked, because pydantic drops an
+        // unknown field and answers 201, so the view saved with no include
+        // filter at all and every keyword typed here was thrown away.
+        topic_filters: includeKeywords,
         exclude_keywords: excludeKeywords,
       }
       if (view?.id) {
@@ -161,6 +168,12 @@ export default function ViewEditor({ view, sources, onSave, onClose }) {
         </div>
 
         <div className="view-editor-footer">
+          {/* Without this a view created by accident was permanent: nothing in
+              the interface called the delete endpoint. */}
+          {view?.id && onDelete && (
+            <button className="btn btn-danger" onClick={() => onDelete(view.id)}
+              style={{ marginRight: 'auto' }}>Delete</button>
+          )}
           <button className="btn" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving || !name.trim()}>
             {saving ? 'Saving...' : 'Save'}

@@ -3,4 +3,5 @@ asyncio_mode = "auto"
 markers = [
     "dashboard: functional dashboard regression tests (requires live service)",
     "browser: end to end tests driven through a real browser (requires live service and a built frontend)",
+    "network: fetches real third-party feeds, excluded from CI because it depends on other people's servers",
 ]

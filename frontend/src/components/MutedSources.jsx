@@ -58,8 +58,12 @@ export default function MutedSources({ onClose }) {
               {mutedSources.map(source => (
                 <div key={source.source_id} className="muted-source-row">
                   <div className="muted-source-info">
-                    <span className="muted-source-name">{source.name || `Source #${source.source_id}`}</span>
-                    <span className="muted-source-expiry">{formatExpiry(source.expires_at)}</span>
+                    {/* The endpoint returns source_name and mute_until. This
+                        read name and expires_at, neither of which exists in
+                        the response, so every row said "Source #12" and every
+                        expiry read as Permanent however it was muted. */}
+                    <span className="muted-source-name">{source.source_name || `Source #${source.source_id}`}</span>
+                    <span className="muted-source-expiry">{formatExpiry(source.mute_until)}</span>
                   </div>
                   <button className="btn btn-sm" onClick={() => handleUnmute(source.source_id)}>Unmute</button>
                 </div>

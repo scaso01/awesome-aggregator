@@ -359,6 +359,11 @@ export default function ContentPanel({ source, items, onHide, onUpdateSource, op
           <div className="loading" style={{ padding: '20px' }}>
             {source.status === 'error' ? (
               <span className="error-text">Error: {source.last_error || 'Failed to fetch'}</span>
+            ) : source.last_fetched ? (
+              // Fetched fine, the feed simply had nothing in it. Saying
+              // "Loading..." here was a lie that never resolved, and it is
+              // indistinguishable from a hung panel.
+              <span className="empty-text">No items in this feed yet.</span>
             ) : 'Loading...'}
           </div>
         ) : (

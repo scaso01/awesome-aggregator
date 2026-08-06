@@ -185,6 +185,7 @@ Most of the defects in the first public release were things no ordinary test cou
 | `test_frontend_wiring.py` | A component that is imported by nothing, or never rendered |
 | `test_dashboard.py`, `test_ui_actions.py` | Live HTTP, with the exact payloads the interface sends, and a WebSocket that carries traffic rather than only completing a handshake |
 | `test_scheduler_recovery.py` | A source that fails once being able to come back |
+| `test_catalog.py` | The shipped source catalog: structure always, live URLs on demand with `-m network` |
 | `test_browser.py` | The real page in Chromium: clicking, dragging, reloading, every display format, and a pushed item arriving with no reload |
 
 Tests that need a live service skip themselves when there is not one. That is convenient locally and dangerous in CI, so `tests/audit_skips.py` splits skips into infrastructure and data. An infrastructure skip fails the build, because it means coverage quietly vanished. A data-dependent skip is allowed, capped and printed.

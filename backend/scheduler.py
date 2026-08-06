@@ -37,7 +37,18 @@ async def refresh_source(source_id: int, source_type: str, url: str, name: str):
         # this source was healthy again, but the database was never updated to
         # match, so the red status dot survived every later success and the
         # source stayed marked as broken for good.
-        await update_source(source_id, status="active", last_error=None)
+        #
+        # last_fetched is stamped here rather than only when items arrive. It
+        # was written inside the item upsert, which does not run for a feed
+        # that returned nothing, so a source that fetched cleanly and had no
+        # items looked like one that had never been fetched at all, and the
+        # panel showed "Loading..." for as long as you cared to watch it.
+        await update_source(
+            source_id,
+            status="active",
+            last_error=None,
+            last_fetched=datetime.utcnow().isoformat(),
+        )
         await manager.send_source_update(source_id, "active")
 
     except SourceFetchError as e:

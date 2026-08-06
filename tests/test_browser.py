@@ -13,6 +13,7 @@ Requires the built frontend and a running service:
     python -m pytest tests/test_browser.py -v
 """
 
+import os
 import re
 import socket
 import tempfile
@@ -948,6 +949,327 @@ def test_a_view_tab_drops_items_matching_its_exclude_filter(browser, temp_view):
         ctx.close()
 
 
+# --- Views, built the way a user builds them ----------------------------------
+#
+# Everything below was reached only through the API before. The editor modal
+# itself had never been opened by a test, and it was sending include keywords
+# under a field name the API does not have, so pydantic dropped them, answered
+# 201, and every include filter a user typed was silently thrown away.
+
+
+def open_view_editor(page):
+    page.locator(".view-tab-add").click()
+    page.wait_for_selector(".view-editor", timeout=15000)
+
+
+def fill_view_editor(page, name, include=None, exclude=None, all_sources=True):
+    page.locator('.view-editor input[placeholder="e.g. Morning Briefing"]').fill(name)
+    if all_sources:
+        boxes = page.locator('.view-editor .toggle-row input[type="checkbox"]')
+        for i in range(boxes.count()):
+            if not boxes.nth(i).is_checked():
+                boxes.nth(i).check()
+    for label, word in (("Include Keywords", include), ("Exclude Keywords", exclude)):
+        if not word:
+            continue
+        field = page.locator(
+            f'.view-editor .form-group:has(label:text-is("{label}")) '
+            f'input[placeholder="Type and press Enter"]'
+        )
+        field.fill(word)
+        field.press("Enter")
+
+
+def test_a_view_built_in_the_editor_keeps_its_include_filter(page):
+    word, _ = pick_filter_word()
+    name = f"Editor {uuid.uuid4().hex[:6]}"
+
+    open_view_editor(page)
+    fill_view_editor(page, name, include=word)
+    page.locator(".view-editor-footer .btn-primary").click()
+    page.wait_for_selector(".view-editor", state="detached", timeout=20000)
+
+    with httpx.Client(base_url=BASE_URL, timeout=30.0) as client:
+        views = client.get("/api/views/").json()
+        made = [v for v in views if v["name"] == name]
+        assert made, "the editor reported saving but no view was created"
+        view = made[0]
+        try:
+            assert view["topic_filters"] == [word], (
+                f"the include keyword never reached the server. Saved "
+                f"topic_filters={view['topic_filters']!r}, expected [{word!r}]. "
+                f"The editor used to send this as include_keywords, which is "
+                f"not a field the API has, so it was dropped and the view "
+                f"saved with no include filter at all."
+            )
+            # And it has to actually filter once you are looking at it.
+            page.locator(".view-tab", has_text=name).first.click()
+            page.wait_for_selector(".digest-item", timeout=30000)
+            shown = page.locator(".digest-item-title").all_inner_texts()
+            allowed = {
+                i.get("title", "")
+                for i in client.get(f"/api/content/view/{view['id']}").json()
+            }
+            assert shown, "the new view showed nothing at all"
+            assert not [t for t in shown if t not in allowed]
+        finally:
+            client.delete(f"/api/views/{view['id']}")
+
+
+def test_a_view_built_in_the_editor_keeps_its_exclude_filter(page):
+    word, _ = pick_filter_word()
+    name = f"Editor {uuid.uuid4().hex[:6]}"
+
+    open_view_editor(page)
+    fill_view_editor(page, name, exclude=word)
+    page.locator(".view-editor-footer .btn-primary").click()
+    page.wait_for_selector(".view-editor", state="detached", timeout=20000)
+
+    with httpx.Client(base_url=BASE_URL, timeout=30.0) as client:
+        view = [v for v in client.get("/api/views/").json() if v["name"] == name][0]
+        try:
+            assert view["exclude_keywords"] == [word]
+        finally:
+            client.delete(f"/api/views/{view['id']}")
+
+
+def test_an_existing_view_can_be_edited(page, temp_view):
+    """The editor's whole Edit mode had no way in.
+
+    `setEditingView` was only ever called with null, so a view could not be
+    renamed, re-scoped, or have its keywords changed after it was made, and the
+    prefilled editor that does all of that was dead code.
+    """
+    view = temp_view(
+        name=f"Editable {uuid.uuid4().hex[:6]}",
+        source_ids=[],
+        topic_filters=["alpha"],
+        exclude_keywords=["beta"],
+    )
+    page.reload(wait_until="networkidle")
+    page.locator(".view-tab", has_text=view["name"]).first.click()
+    page.locator(".view-tab-edit").first.click()
+    page.wait_for_selector(".view-editor", timeout=15000)
+
+    assert "Edit View" in page.locator(".view-editor-header").inner_text()
+    chips = page.locator(".view-editor .keyword-chip").all_inner_texts()
+    joined = " ".join(chips)
+    assert "alpha" in joined, (
+        f"the saved include keyword did not load into the editor: {chips!r}. "
+        f"It read view.include_keywords, which the API never returns."
+    )
+    assert "beta" in joined
+
+    renamed = f"{view['name']} renamed"
+    page.locator('.view-editor input[placeholder="e.g. Morning Briefing"]').fill(renamed)
+    page.locator(".view-editor-footer .btn-primary").click()
+    page.wait_for_selector(".view-editor", state="detached", timeout=20000)
+
+    with httpx.Client(base_url=BASE_URL, timeout=30.0) as client:
+        after = client.get(f"/api/views/{view['id']}").json()
+    assert after["name"] == renamed
+    assert after["topic_filters"] == ["alpha"], "editing wiped the include filter"
+
+
+def test_a_view_can_be_deleted_from_the_editor(page):
+    """A view made by accident used to be permanent.
+
+    The delete endpoint existed and nothing in the interface called it.
+    """
+    name = f"Throwaway {uuid.uuid4().hex[:6]}"
+    open_view_editor(page)
+    fill_view_editor(page, name, all_sources=False)
+    page.locator(".view-editor-footer .btn-primary").click()
+    page.wait_for_selector(".view-editor", state="detached", timeout=20000)
+
+    page.locator(".view-tab", has_text=name).first.click()
+    page.locator(".view-tab-edit").first.click()
+    page.wait_for_selector(".view-editor", timeout=15000)
+    page.locator(".view-editor-footer .btn-danger").click()
+    page.wait_for_selector(".view-editor", state="detached", timeout=20000)
+
+    with httpx.Client(base_url=BASE_URL, timeout=30.0) as client:
+        names = [v["name"] for v in client.get("/api/views/").json()]
+    assert name not in names, "delete closed the dialog but kept the view"
+
+
+def test_view_tabs_reorder_by_dragging(page, temp_view):
+    first = temp_view(name=f"AAA {uuid.uuid4().hex[:4]}", source_ids=[])
+    second = temp_view(name=f"ZZZ {uuid.uuid4().hex[:4]}", source_ids=[])
+    page.reload(wait_until="networkidle")
+
+    tabs = lambda: [
+        t for t in page.locator(".view-tab").all_inner_texts()
+        if t.strip() in (first["name"], second["name"])
+    ]
+    before = tabs()
+    assert before == [first["name"], second["name"]], f"unexpected start order: {before}"
+
+    page.locator(".view-tab", has_text=second["name"]).first.drag_to(
+        page.locator(".view-tab", has_text=first["name"]).first
+    )
+    page.wait_for_function(
+        "names => Array.from(document.querySelectorAll('.view-tab'))"
+        ".map(t => t.textContent.trim()).filter(t => names.includes(t))[0] === names[1]",
+        arg=[first["name"], second["name"]],
+        timeout=15000,
+    )
+
+    with httpx.Client(base_url=BASE_URL, timeout=30.0) as client:
+        order = [
+            v["name"] for v in client.get("/api/views/").json()
+            if v["name"] in (first["name"], second["name"])
+        ]
+    assert order == [second["name"], first["name"]], (
+        f"the drag did not persist, server order is {order}"
+    )
+
+
+# --- Sources: mute, hide, restore, and the types on the tin --------------------
+
+
+def test_muting_a_source_clears_the_board_and_the_manager_brings_it_back(page):
+    """Mute is well covered against the API and had never been clicked."""
+    panel = page.locator(".content-panel").first
+    name = panel.locator(".panel-title").inner_text()
+    before = page.locator(".content-panel").count()
+
+    panel.locator(".content-item").first.locator(".item-action-trigger").click()
+    page.wait_for_selector(".item-action-menu", timeout=10000)
+    page.get_by_role("button", name="Mute source").click()
+    page.get_by_role("button", name="24 hours").click()
+
+    page.wait_for_function(
+        "n => document.querySelectorAll('.content-panel').length === n - 1",
+        arg=before, timeout=20000,
+    )
+
+    page.get_by_role("button", name="Muted").click()
+    page.wait_for_selector(".muted-source-row", timeout=15000)
+    row = page.locator(".muted-source-row", has_text=name).first
+    assert row.count() > 0, f"{name} was muted but is not in the manager"
+    row.get_by_role("button", name="Unmute").click()
+    page.locator(".view-editor .btn-close").click()
+
+    page.wait_for_function(
+        "n => document.querySelectorAll('.content-panel').length === n",
+        arg=before, timeout=20000,
+    )
+
+
+def test_a_hidden_source_comes_back_from_the_tray(page):
+    panel = page.locator(".content-panel").first
+    name = panel.locator(".panel-title").inner_text()
+    before = page.locator(".content-panel").count()
+
+    panel.locator('.btn-close[title="Hide panel"]').click()
+    page.wait_for_function(
+        "n => document.querySelectorAll('.content-panel').length === n - 1",
+        arg=before, timeout=20000,
+    )
+
+    page.locator(".header-actions .btn", has_text="hidden").first.click()
+    page.wait_for_selector(".hidden-tray", timeout=15000)
+    tray_row = page.locator(".hidden-source", has_text=name).first
+    assert tray_row.count() > 0, f"{name} was hidden but is not in the tray"
+    tray_row.get_by_role("button", name="Show").click()
+
+    page.wait_for_function(
+        "n => document.querySelectorAll('.content-panel').length === n",
+        arg=before, timeout=20000,
+    )
+
+
+def test_a_plain_web_page_can_be_added_as_a_source(page):
+    """Generic pages are one of the four advertised source types.
+
+    Detection had tests. Adding one and seeing it on the board did not.
+    """
+    name = f"Web Page {uuid.uuid4().hex[:6]}"
+    page.get_by_role("button", name="+ Add Source").click()
+    page.wait_for_selector(".tab-bar", timeout=15000)
+    page.get_by_role("button", name="Custom URL").click()
+    page.locator('input[placeholder="My Feed"]').fill(name)
+    page.locator('.custom-form select').first.select_option("generic")
+    page.locator('input[type="url"]').fill("https://example.com")
+    page.get_by_role("button", name="Add Source", exact=True).click()
+
+    try:
+        page.wait_for_selector(f'.panel-title:text-is("{name}")', timeout=30000)
+        panel = page.locator(".content-panel", has_text=name).first
+        assert "Web" in panel.locator(".panel-badge").inner_text()
+    finally:
+        with httpx.Client(base_url=BASE_URL, timeout=30.0) as client:
+            for source in client.get("/api/sources/").json():
+                if source["name"] == name:
+                    client.delete(f"/api/sources/{source['id']}")
+
+
+# --- The rest of the panel controls -------------------------------------------
+
+
+def test_the_custom_format_builder_applies(page, formats_restored):
+    panel = page.locator(".content-panel").first
+    panel.locator(".btn-icon").first.click()
+    page.wait_for_selector(".format-menu", timeout=10000)
+    page.locator('.format-option:has(.format-label:text-is("Custom"))').click()
+    page.wait_for_selector(".custom-builder", timeout=10000)
+
+    # Turn the description off, which is the most visible of the toggles.
+    # Click the label rather than the input: the input sits inside a scrolling
+    # menu and is not reliably actionable on its own, and a label click is what
+    # a person does anyway.
+    toggle = page.locator('.custom-builder .toggle-row', has_text="Description").first
+    toggle.scroll_into_view_if_needed()
+    toggle.locator("span").click()
+    assert not toggle.locator('input[type="checkbox"]').is_checked()
+    page.get_by_role("button", name="Apply Custom").click()
+
+    page.wait_for_selector(".format-menu", state="detached", timeout=10000)
+    panel.locator(".content-item").first.wait_for(state="visible", timeout=15000)
+    assert panel.locator(".item-description").count() == 0, (
+        "the custom builder said it applied and the descriptions are still there"
+    )
+
+
+def test_a_resized_panel_keeps_its_size_across_a_reload(page):
+    grid_item = page.locator(".dashboard-grid .react-grid-item").first
+    before = grid_item.bounding_box()
+
+    handle = grid_item.locator(".react-resizable-handle").first
+    handle.hover()
+    page.mouse.down()
+    page.mouse.move(before["x"] + before["width"] + 40,
+                    before["y"] + before["height"] + 120, steps=12)
+    page.mouse.up()
+
+    page.wait_for_function(
+        "h => document.querySelector('.dashboard-grid .react-grid-item')"
+        ".getBoundingClientRect().height > h + 20",
+        arg=before["height"], timeout=15000,
+    )
+    grown = grid_item.bounding_box()["height"]
+
+    page.reload(wait_until="networkidle")
+    page.wait_for_selector(".content-panel", timeout=30000)
+    page.wait_for_timeout(1500)
+    after = page.locator(".dashboard-grid .react-grid-item").first.bounding_box()["height"]
+    assert after > before["height"] + 20, (
+        f"the resize did not survive a reload: {before['height']} -> {grown} -> {after}"
+    )
+
+
+def test_the_search_tab_finds_something_to_add(page):
+    page.get_by_role("button", name="+ Add Source").click()
+    page.wait_for_selector(".tab-bar", timeout=15000)
+    page.get_by_role("button", name="Search").click()
+    box = page.locator('input[placeholder^="Search sources"]')
+    box.fill("python")
+    box.press("Enter")
+    page.wait_for_selector(".source-card", timeout=30000)
+    assert page.locator(".source-card").count() > 0
+
+
 # Hiding is the one action here with no undo. There is no unhide endpoint, so
 # every run of this permanently removes an item from the pool that the digest
 # and the panels above draw on. Running it last keeps it from starving the
@@ -978,3 +1300,90 @@ def test_hiding_an_item_removes_it_from_the_panel(page):
         arg=before,
         timeout=15000,
     )
+
+
+# --- First run ----------------------------------------------------------------
+#
+# Last on purpose. The topic picker only appears on an empty board, so this is
+# the one test that has to clear the sources out and put them back, and doing
+# that mid file would pull the content out from under everything above.
+#
+# It earns the disruption: this screen is the first thing anybody who clones
+# the repository sees, and nothing had ever opened it.
+
+
+@pytest.fixture()
+def emptied_board():
+    """Take every source away, then put them all back afterwards.
+
+    Gated behind an environment variable because it is the only test here that
+    touches every source at once. CI runs against a throwaway database and sets
+    it; a person running this against the instance they actually read would
+    otherwise have their board emptied and rebuilt underneath them, losing the
+    fetched articles even though the sources come back.
+    """
+    if not os.getenv("AGGREGATOR_E2E_DESTRUCTIVE"):
+        pytest.skip(
+            "needs AGGREGATOR_E2E_DESTRUCTIVE=1, it empties and rebuilds the board"
+        )
+
+    with httpx.Client(base_url=BASE_URL, timeout=60.0) as client:
+        saved = [
+            {
+                "name": s["name"],
+                "source_type": s["source_type"],
+                "url": s["url"],
+                "refresh_seconds": s["refresh_seconds"],
+                "display_format": s.get("display_format") or "compact",
+                "category": s.get("category") or "General",
+            }
+            for s in client.get("/api/sources/").json()
+        ]
+        for source in client.get("/api/sources/").json():
+            client.delete(f"/api/sources/{source['id']}")
+
+    yield
+
+    with httpx.Client(base_url=BASE_URL, timeout=60.0) as client:
+        for source in client.get("/api/sources/").json():
+            client.delete(f"/api/sources/{source['id']}")
+        for payload in saved:
+            client.post("/api/sources/", json=payload)
+
+
+def test_the_first_run_screen_offers_topics_and_builds_a_board(browser, emptied_board):
+    ctx = browser.new_context(viewport={"width": 1600, "height": 1000})
+    pg = ctx.new_page()
+    errors = []
+    pg.on("pageerror", lambda e: errors.append(str(e)))
+    try:
+        pg.goto(BASE_URL, wait_until="networkidle", timeout=60000)
+
+        # An empty board goes straight to the picker rather than to a welcome
+        # screen with a button on it.
+        pg.wait_for_selector(".onboarding-overlay", timeout=30000)
+        assert pg.locator(".onboarding-topic").count() > 0, (
+            "the topic picker opened with nothing to pick"
+        )
+
+        # Every topic must offer something. A topic whose sources were all
+        # removed would sit there looking clickable and add nothing.
+        counts = pg.locator(".onboarding-topic-count").all_inner_texts()
+        empty = [c for c in counts if c.strip().startswith("0 ")]
+        assert not empty, f"topics offering no sources: {empty}"
+
+        pg.locator(".onboarding-topic").first.click()
+        cta = pg.get_by_role("button", name="Get Started")
+        assert cta.is_enabled(), "a topic is selected and Get Started is still disabled"
+        cta.click()
+
+        pg.wait_for_selector(".content-panel", timeout=60000)
+        assert pg.locator(".content-panel").count() > 0
+
+        with httpx.Client(base_url=BASE_URL, timeout=30.0) as client:
+            assert client.get("/api/sources/").json(), (
+                "the picker finished but created no sources"
+            )
+    finally:
+        assert not errors, f"uncaught JavaScript errors: {errors}"
+        ctx.close()

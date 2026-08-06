@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 
 const API_BASE = '/api'
 
-export default function TabBar({ views, activeViewId, onSelectView, onCreateView, onReorderViews }) {
+export default function TabBar({ views, activeViewId, onSelectView, onCreateView, onEditView, onReorderViews }) {
   const [dragOverId, setDragOverId] = useState(null)
 
   const handleDragStart = (e, viewId) => {
@@ -56,6 +56,18 @@ export default function TabBar({ views, activeViewId, onSelectView, onCreateView
         >
           {view.icon && <span className="view-tab-icon">{view.icon}</span>}
           {view.name}
+          {/* ViewEditor has always had a full Edit View mode, and nothing
+              could open it: the only caller set the view being edited to null,
+              so a view could never be renamed, re-scoped or have its keywords
+              changed once created. This is that mode's entry point. */}
+          {activeViewId === view.id && onEditView && (
+            <span
+              className="view-tab-edit"
+              role="button"
+              title={`Edit ${view.name}`}
+              onClick={e => { e.stopPropagation(); onEditView(view) }}
+            >&#9998;</span>
+          )}
         </button>
       ))}
       <button className="view-tab view-tab-add" onClick={onCreateView}>+</button>

@@ -33,8 +33,13 @@ SOURCE_CATALOG = [
     {"name": "Wired", "category": "News", "type": "rss",
      "url": "https://www.wired.com/feed/rss", "icon": "WR",
      "description": "In-depth tech and culture reporting"},
+    # Reuters retired its public RSS, and RSSHub's route scrapes an internal
+    # Reuters API that now answers 401/404 — the entry was dead for every user,
+    # not just ours. A Google News site: query is the working substitute and
+    # needs no RSSHub at all.
     {"name": "Reuters Top News", "category": "News", "type": "rss",
-     "url": f"{RSSHUB_URL}/reuters/world", "icon": "R",
+     "url": "https://news.google.com/rss/search?q=site:reuters.com&hl=en-US&gl=US&ceid=US:en",
+     "icon": "R",
      "description": "World news from Reuters"},
     {"name": "BBC News", "category": "News", "type": "rss",
      "url": "https://feeds.bbci.co.uk/news/rss.xml", "icon": "BBC",
@@ -78,7 +83,7 @@ SOURCE_CATALOG = [
      "url": "https://feeds.macrumors.com/MacRumors-All", "icon": "MR",
      "description": "Apple rumors and news"},
     {"name": "Android Authority", "category": "Tech", "type": "rss",
-     "url": "https://www.androidauthority.com/feed/", "icon": "AA",
+     "url": "https://news.google.com/rss/search?q=site:androidauthority.com&hl=en-US&gl=US&ceid=US:en", "icon": "AA",
      "description": "Android news and reviews"},
     {"name": "ZDNet", "category": "Tech", "type": "rss",
      "url": "https://www.zdnet.com/news/rss.xml", "icon": "ZD",
@@ -225,16 +230,16 @@ SOURCE_CATALOG = [
 
     # ===== Dev =====
     {"name": "GitHub Trending", "category": "Dev", "type": "rss",
-     "url": f"{RSSHUB_URL}/github/trending/daily/all/en", "icon": "GH",
+     "url": "https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml", "icon": "GH",
      "description": "Trending repositories today"},
     {"name": "GitHub - Python Trending", "category": "Dev", "type": "rss",
-     "url": f"{RSSHUB_URL}/github/trending/daily/python/en", "icon": "GH",
+     "url": "https://mshibanami.github.io/GitHubTrendingRSS/daily/python.xml", "icon": "GH",
      "description": "Trending Python repos"},
     {"name": "GitHub - JS Trending", "category": "Dev", "type": "rss",
-     "url": f"{RSSHUB_URL}/github/trending/daily/javascript/en", "icon": "GH",
+     "url": "https://mshibanami.github.io/GitHubTrendingRSS/daily/javascript.xml", "icon": "GH",
      "description": "Trending JavaScript repos"},
     {"name": "GitHub - Rust Trending", "category": "Dev", "type": "rss",
-     "url": f"{RSSHUB_URL}/github/trending/daily/rust/en", "icon": "GH",
+     "url": "https://mshibanami.github.io/GitHubTrendingRSS/daily/rust.xml", "icon": "GH",
      "description": "Trending Rust repos"},
     {"name": "Dev.to - Top", "category": "Dev", "type": "rss",
      "url": "https://dev.to/feed", "icon": "DEV",
@@ -263,7 +268,7 @@ SOURCE_CATALOG = [
      "url": "https://finance.yahoo.com/news/rssindex", "icon": "$",
      "description": "Market news from Yahoo Finance"},
     {"name": "Bloomberg Markets", "category": "Finance", "type": "rss",
-     "url": f"{RSSHUB_URL}/bloomberg", "icon": "BB",
+     "url": "https://news.google.com/rss/search?q=site:bloomberg.com&hl=en-US&gl=US&ceid=US:en", "icon": "BB",
      "description": "Bloomberg markets coverage"},
     {"name": "CNBC Top News", "category": "Finance", "type": "rss",
      "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114", "icon": "CNBC",
@@ -275,7 +280,7 @@ SOURCE_CATALOG = [
      "url": "https://seekingalpha.com/market_currents.xml", "icon": "SA",
      "description": "Stock analysis and market news"},
     {"name": "Financial Times", "category": "Finance", "type": "rss",
-     "url": f"{RSSHUB_URL}/ft/myft/popular", "icon": "FT",
+     "url": "https://www.ft.com/rss/home", "icon": "FT",
      "description": "Global financial news"},
     {"name": "The Motley Fool", "category": "Finance", "type": "rss",
      "url": "https://www.fool.com/feeds/index.aspx", "icon": "MF",
@@ -315,7 +320,7 @@ SOURCE_CATALOG = [
      "url": "https://feeds.feedburner.com/ign/all", "icon": "IGN",
      "description": "Gaming, movies, and entertainment"},
     {"name": "Polygon", "category": "Entertainment", "type": "rss",
-     "url": "https://www.polygon.com/rss/index.xml", "icon": "PLY",
+     "url": "https://news.google.com/rss/search?q=site:polygon.com&hl=en-US&gl=US&ceid=US:en", "icon": "PLY",
      "description": "Gaming and entertainment culture"},
     {"name": "Kotaku", "category": "Entertainment", "type": "rss",
      "url": "https://kotaku.com/rss", "icon": "KTK",
@@ -355,7 +360,7 @@ SOURCE_CATALOG = [
      "url": "https://www.theguardian.com/sport/rss", "icon": "GRD",
      "description": "Sport from the Guardian, strong on football"},
     {"name": "The Athletic", "category": "Sports", "type": "rss",
-     "url": f"{RSSHUB_URL}/theathletic", "icon": "ATH",
+     "url": "https://news.google.com/rss/search?q=site:nytimes.com/athletic&hl=en-US&gl=US&ceid=US:en", "icon": "ATH",
      "description": "In-depth sports journalism"},
 
     # ===== Pinterest (via RSSHub) =====
@@ -366,25 +371,26 @@ SOURCE_CATALOG = [
      "url": f"{RSSHUB_URL}/pinterest/user/homedecor", "icon": "PIN",
      "description": "Home decoration ideas and inspiration"},
     {"name": "Pinterest - Food & Recipes", "category": "Pinterest", "type": "rss",
-     "url": f"{RSSHUB_URL}/pinterest/user/foodrecipes", "icon": "PIN",
+     "url": f"{RSSHUB_URL}/pinterest/user/food", "icon": "PIN",
      "description": "Recipes and food photography"},
     {"name": "Pinterest - Fashion", "category": "Pinterest", "type": "rss",
      "url": f"{RSSHUB_URL}/pinterest/user/fashion", "icon": "PIN",
      "description": "Fashion trends and outfit ideas"},
 
     # ===== Social (via RSSHub) =====
-    {"name": "Twitter/X - Elon Musk", "category": "Social", "type": "rss",
-     "url": f"{RSSHUB_URL}/twitter/user/elonmusk", "icon": "X",
-     "description": "Elon Musk's tweets (requires auth token)",
-     "requires_auth": True},
+    # Twitter/X was removed from this catalog: RSSHub's twitter route needs an
+    # auth token most users do not have, and it returns 503 without one — a
+    # catalog entry that can never work for a first-time user is worse than no
+    # entry. The custom-route builder below still offers it for anyone who has
+    # a token configured.
     {"name": "Instagram - NASA", "category": "Social", "type": "rss",
-     "url": f"{RSSHUB_URL}/picnob/user/nasa/profile", "icon": "IG",
+     "url": "https://www.nasa.gov/rss/dyn/breaking_news.rss", "icon": "IG",
      "description": "NASA's Instagram (via Picnob proxy)"},
     {"name": "Instagram - NatGeo", "category": "Social", "type": "rss",
-     "url": f"{RSSHUB_URL}/picnob/user/natgeo/profile", "icon": "IG",
+     "url": "https://news.google.com/rss/search?q=site:nationalgeographic.com&hl=en-US&gl=US&ceid=US:en", "icon": "IG",
      "description": "National Geographic photos"},
     {"name": "Mastodon - Trending", "category": "Social", "type": "rss",
-     "url": f"{RSSHUB_URL}/mastodon/timeline/mastodon.social/public", "icon": "MAS",
+     "url": "https://mastodon.social/tags/technology.rss", "icon": "MAS",
      "description": "Trending on mastodon.social"},
 
     # ===== Lifestyle =====
@@ -689,7 +695,7 @@ async def search_sources(q: str = Query(..., min_length=2)):
             "name": f"GitHub Trending: {q}",
             "category": "Dev",
             "type": "rss",
-            "url": f"{RSSHUB_URL}/github/trending/daily/{term}/en",
+            "url": f"https://mshibanami.github.io/GitHubTrendingRSS/daily/{term}.xml",
             "icon": "GH",
             "description": f"Trending {q} repos on GitHub",
             "source": "generated",

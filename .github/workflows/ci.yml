@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  # newest-libraries.yml calls this weekly with newest: true, which drops the pins.
+  workflow_call:
+    inputs:
+      newest:
+        type: boolean
+        default: false
 
 env:
   # Points the app at tests/fixtures/ci-config.yaml, whose sources are served
@@ -34,7 +40,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          pip install -r requirements-dev.txt ${{ !inputs.newest && '-c requirements-ci.txt' || '' }}
 
       - name: Import check
         # A missing runtime dependency used to surface only as a failed import
@@ -167,7 +173,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          pip install -r requirements-dev.txt ${{ !inputs.newest && '-c requirements-ci.txt' || '' }}
           python -m playwright install --with-deps chromium
 
       - name: Build the frontend
@@ -222,3 +228,11 @@ jobs:
       - name: Server log
         if: always()
         run: cat server.log || true
+
+  # The one check branch protection requires, so matrix changes never strand a merge.
+  ci-ok:
+    if: always()
+    needs: [backend, frontend, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ join(needs.*.result, ' ') }}" = "success success success"

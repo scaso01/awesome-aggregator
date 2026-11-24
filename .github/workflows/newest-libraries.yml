@@ -1,0 +1,14 @@
+name: Newest libraries
+
+# CI pins Python versions (requirements-ci.txt). This weekly run is the same CI with the
+# pins dropped, so a release that breaks a fresh install shows up within a week.
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    with:
+      newest: true

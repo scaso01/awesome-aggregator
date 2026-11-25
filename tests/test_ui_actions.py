@@ -15,9 +15,7 @@ Run with the service up:
 """
 
 import json
-import socket
 import time
-from contextlib import closing
 
 import httpx
 import pytest
@@ -27,11 +25,12 @@ BASE_URL = "http://localhost:8001"
 
 
 def is_service_running() -> bool:
+    """True only if awesome-aggregator's own health check answers, not just any program on 8001."""
     try:
-        with closing(socket.create_connection(("localhost", 8001), timeout=2)):
-            return True
-    except (ConnectionRefusedError, OSError, socket.timeout):
+        body = httpx.get(f"{BASE_URL}/api/health", timeout=2).json()
+    except (httpx.HTTPError, ValueError):
         return False
+    return isinstance(body, dict) and body.get("status") == "ok" and "websocket_clients" in body
 
 
 pytestmark = [

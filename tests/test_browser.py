@@ -15,13 +15,11 @@ Requires the built frontend and a running service:
 
 import os
 import re
-import socket
 import tempfile
 import threading
 import time
 import uuid
 import xml.etree.ElementTree as ET
-from contextlib import closing
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -39,11 +37,12 @@ DIST = Path(__file__).parent.parent / "frontend" / "dist" / "index.html"
 
 
 def is_service_running() -> bool:
+    """True only if awesome-aggregator's own health check answers, not just any program on 8001."""
     try:
-        with closing(socket.create_connection(("localhost", 8001), timeout=2)):
-            return True
-    except (ConnectionRefusedError, OSError, socket.timeout):
+        body = httpx.get(f"{BASE_URL}/api/health", timeout=2).json()
+    except (httpx.HTTPError, ValueError):
         return False
+    return isinstance(body, dict) and body.get("status") == "ok" and "websocket_clients" in body
 
 
 pytestmark = [

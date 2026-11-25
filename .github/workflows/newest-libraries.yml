@@ -1,6 +1,6 @@
 name: Newest libraries
 
-# CI pins Python versions (requirements-ci.txt). This weekly run is the same CI with the
+# CI pins Python versions (ci/uv.lock). This weekly run is the same CI with the
 # pins dropped, so a release that breaks a fresh install shows up within a week.
 on:
   schedule:
